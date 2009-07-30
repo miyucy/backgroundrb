@@ -6,18 +6,20 @@ class BdrbJobQueue < ActiveRecord::Base
   def self.find_next(worker_name,worker_key = nil)
     returned_job = nil
     ActiveRecord::Base.verify_active_connections!
-    transaction do
-      unless worker_key
-        #use ruby time stamps for time calculations as db might have different times than what is calculated by ruby/rails
-        t_job = find(:first,:conditions => [" worker_name = ? AND taken = ? AND scheduled_at <= ? ", worker_name, 0, Time.now.utc ],:lock => true, :order => 'priority desc')
-      else
-        t_job = find(:first,:conditions => [" worker_name = ? AND taken = ? AND worker_key = ? AND scheduled_at <= ? ", worker_name, 0, worker_key, Time.now.utc ],:lock => true)
-      end
-      if t_job
-        t_job.taken = 1
-        t_job.started_at = Time.now.utc
-        t_job.save
-        returned_job = t_job
+    silence do
+      transaction do
+        unless worker_key
+          #use ruby time stamps for time calculations as db might have different times than what is calculated by ruby/rails
+          t_job = find(:first,:conditions => [" worker_name = ? AND taken = ? AND scheduled_at <= ? ", worker_name, 0, Time.now.utc ],:lock => true, :order => 'priority desc')
+        else
+          t_job = find(:first,:conditions => [" worker_name = ? AND taken = ? AND worker_key = ? AND scheduled_at <= ? ", worker_name, 0, worker_key, Time.now.utc ],:lock => true)
+        end
+        if t_job
+          t_job.taken = 1
+          t_job.started_at = Time.now.utc
+          t_job.save
+          returned_job = t_job
+        end
       end
     end
     returned_job
